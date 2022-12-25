@@ -1,197 +1,344 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using DG.Tweening;
 using ModestTree;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
-public class StackManager : MonoBehaviour
+namespace Assets.Scripts
 {
-    [SerializeField] private List<GameObject> diamondList;
-
-    [SerializeField] private float diamondAnimationTime;
-    [SerializeField] private Ease diamondEaseType;
-
-    [SerializeField] private GameObject diamondPrefabRed;
-    [SerializeField] private GameObject diamondPrefabYellow;
-    [SerializeField] private GameObject diamondPrefabBlue;
-    [SerializeField] private GameObject diamondPrefabGreen;
-
-
-    [SerializeField] private List<string> diamondColors;
-    private int activeIndex;
-    
-    // Start is called before the first frame update
-    void Start()
+    public class StackManager : MonoBehaviour
     {
-        foreach (var diamonds in diamondList)
+        //Stack object list
+        [SerializeField] private List<GameObject> diamondList;
+
+    
+        //Merge animation properties
+        [SerializeField] private float diamondAnimationTime;
+        [SerializeField] private Ease diamondEaseType;
+    
+        //Special prefabs for effects
+        [SerializeField] private GameObject diamondPrefabRed;
+        [SerializeField] private GameObject diamondPrefabYellow;
+        [SerializeField] private GameObject diamondPrefabBlue;
+        [SerializeField] private GameObject diamondPrefabGreen;
+
+
+        //record stack color properties
+        [SerializeField] private List<string> diamondColors;
+        [SerializeField] private GameObject hand;
+
+        
+        //Point to last element in stack
+        public int lastIndex;
+
+
+        private bool gateStart;
+        // Start is called before the first frame update
+        void Start()
         {
-            foreach (Transform child in diamonds.transform)
-            {
-                child.gameObject.transform.localScale = Vector3.zero;
-            }
+            EventManager.CollectRed += CollectDiamondRed;
+            EventManager.CollectBlue += CollectDiamondBlue;
+            EventManager.CollectYellow += CollectDiamondYellow;
+            EventManager.CollectGreen += CollectDiamondGreen;
+            EventManager.Door += MergeDiamondsInList;
+            EventManager.Trap += TakeHit;
+            EventManager.LoadNextLevel += ResetStack;
+            EventManager.LoadNextLevel += FullResetStack;
+            ResetStack();
         }
 
-        activeIndex = 0;
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.G))
+        private void FullResetStack()
+        {
+            diamondColors.Clear();
+        }
+        
+        private void CollectDiamondRed()
         {
             CollectDiamond("Red");
         }
-        if (Input.GetKeyDown(KeyCode.H))
+        private void CollectDiamondBlue()
         {
             CollectDiamond("Blue");
         }
-        if (Input.GetKeyDown(KeyCode.J))
+        private void CollectDiamondYellow()
         {
             CollectDiamond("Yellow");
         }
-        if (Input.GetKeyDown(KeyCode.K))
+        private void CollectDiamondGreen()
         {
             CollectDiamond("Green");
         }
-
-        if (Input.GetKeyDown(KeyCode.Space))
+        
+        private void TakeHit()
         {
-            /*List<int> temp = new List<int>();
-            temp.Add(3);
-            List<string> tempColor = new List<string>();
-            tempColor.Add("red");
-            MergeDiamonds(1,temp,tempColor);*/
-            List<int> temp = new List<int>();
-            List<string> temp1 = new List<string>();
-            temp.Add(1);
-            temp.Add(2);
-            temp1.Add("Red");
-            temp1.Add("Red");
-            MergeDiamonds(0,temp,temp1);
-            DiamondUpgradeAnimation(0,temp.Capacity);
+            List<string> newList = new List<string>();
+
+            for (int i = 0; i < diamondColors.Count/2; i++)
+            {
+                newList.Add(diamondColors[i]);
+            }
+            for (int i = diamondColors.Count/2; i < diamondColors.Count ; i++)
+            {
+                var obj = DiamondInstantiate(diamondColors[i]);
+                obj.transform.localPosition = diamondList[i].transform.position;
+                obj.transform.localScale = new Vector3(2, 2, 2);
+                obj.GetComponent<Rigidbody>().AddForce(new Vector3(Random.Range(-1,1),2f,20f),ForceMode.Impulse);
+            }
+            
+
+            diamondColors = newList;
+            ApplyList();
         }
-    }
 
-    private void CollectDiamond(string color)
-    {
-        if (activeIndex < diamondList.Capacity)
+        private GameObject DiamondInstantiate(string color)
         {
-            foreach (Transform child in diamondList[activeIndex].transform)
+            if (color == "Red")
+            {
+                var obj = Instantiate(diamondPrefabRed);
+                return obj;
+            }else if (color == "Blue")
+            {
+                var obj = Instantiate(diamondPrefabBlue);
+                return obj;
+            }else if (color == "Green")
+            {
+                var obj = Instantiate(diamondPrefabGreen);
+                return obj;
+            }
+            else
+            {
+                var obj = Instantiate(diamondPrefabYellow);
+                return obj;
+            }
+        }
+        private void MergeDiamondsInList()
+        {
+            if (diamondColors.Count != 0)
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add(diamondColors[0]);
+                for (int i = 1; i < diamondColors.Count; i++)
+                {
+                    if (diamondColors[i] != diamondColors[i-1])
+                    {
+                        newList.Add(diamondColors[i]);
+                    }
+                }
+
+                diamondColors = newList;
+                ApplyList();
+            }
+        }
+
+        private void ApplyList()
+        {
+            ResetStack();
+            for (int i = 0; i < diamondColors.Count; i++)
+            {
+                SetDiamondColor(diamondColors[i],i);
+            }
+
+            lastIndex = diamondColors.Count;
+        }
+
+
+        // Set inactive all diamonds in the stack and sets active index to 0 
+        private void ResetStack()
+        {
+            foreach (var diamonds in diamondList)
+            {
+                foreach (Transform child in diamonds.transform)
+                {
+                    child.gameObject.transform.localScale = Vector3.zero;
+                }
+            }
+            lastIndex = 0;
+        }
+        
+        //Active a diamond in the last index with a color property
+        private void CollectDiamond(string color)
+        {
+            if (lastIndex < diamondList.Capacity)
+            {
+                foreach (Transform child in diamondList[lastIndex].transform)
+                {
+                    if (child.gameObject.name == color)
+                    {
+                        child.gameObject.transform.DOScale(new Vector3(2, 2, 2),diamondAnimationTime).SetEase(diamondEaseType);
+                        //update color list 
+                        diamondColors.Add(color);
+                        //update last index
+                        lastIndex += 1;
+                    }
+                    else
+                    {
+                        child.gameObject.transform.localScale = Vector3.zero;
+                    }
+                }
+           
+            }
+        }
+
+        private void SetDiamondColor(string color,int index)
+        {
+            foreach (Transform child in diamondList[index].transform)
             {
                 if (child.gameObject.name == color)
                 {
-                    child.gameObject.transform.DOScale(new Vector3(2, 2, 2),diamondAnimationTime).SetEase(diamondEaseType);
-                    diamondColors.Add(color);
-                    activeIndex += 1;
+                    child.gameObject.transform.localScale = new Vector3(2,2,2);
+                    //update color list
+                    diamondColors[index] = color;
                 }
                 else
                 {
                     child.gameObject.transform.localScale = Vector3.zero;
                 }
             }
-           
         }
-    }
 
-    // If ı use other words than color names it will set diamond closed
-    private void SetDiamond(string color,int index)
-    {
-        foreach (Transform child in diamondList[index].transform)
+        private void RemoveDiamond(int index)
         {
-            if (child.gameObject.name == color)
+            foreach (Transform child in diamondList[index].transform)
             {
-                child.gameObject.transform.DOScale(new Vector3(2, 2, 2),diamondAnimationTime).SetEase(diamondEaseType);
+                child.transform.localScale = Vector3.zero;
             }
-            else
-            {
-                child.gameObject.transform.localScale = Vector3.zero;
-            }
-        }
-    }
-
-    /*private void CalculateMergedList()
-    {
-        for (int i = 0; i < calculatorArray.Capacity; i++)
-        {
-            var temp = calculatorArray[i];
-            var startPoint = i;
-            if (calculatorArray[i+1] == )
-            {
                 
+        }
+
+        /*private void CalculateMergedList()
+        {
+            int repeatCount = 0;
+            string color;
+            List<int> mergedIndex = new List<int>();
+            for (int i = 0; i < diamondColors.Count; i++)
+            {
+                color = diamondColors[i];
+                
+                for (int j = i+1; j < diamondColors.Count; j++)
+                {
+                    if (color == diamondColors[j])
+                    {
+                        mergedIndex.Add(j);
+                        if (j == diamondColors.Count-1)
+                        {
+                            
+                             MergeDiamonds(i,mergedIndex,color);
+                             i += mergedIndex.Count;
+                             mergedIndex.Clear();
+                             return;
+                        }
+                    }
+                    else
+                    {
+                        if (mergedIndex.Count != 0)
+                        {
+                            //merged index has a value and we are in a diffrent color index
+                            MergeDiamonds(i, mergedIndex, color);
+                            i += mergedIndex.Count;
+                            mergedIndex.Clear();
+                            return;
+                        }
+
+                        break;
+                    }
+                }
             }
-        }
-    }*/
-
-    private void MergeDiamonds(int toMerge, List<int> mergedIndex, List<string>mergedColor)
-    {
-        mergedIndex.Sort();
-        for (int i = 0; i < mergedIndex.Count; i++)
+        }*/
+        
+        /*private void MergeDiamonds(int toMerge, List<int> mergedIndex, string color)
         {
-            if (mergedColor[i] == "Red")
+            mergedIndex.Sort();
+            
+            for (int i = 0; i < mergedIndex.Count; i++)
             {
-                SetDiamond("clear",mergedIndex[i]); //close the real one
-                var prefab = Instantiate(diamondPrefabRed, diamondList[mergedIndex[i]].transform);
-                prefab.transform.localPosition = Vector3.zero;
-                prefab.transform.DOMove(diamondList[toMerge].transform.position, 1f).OnComplete((() =>
+                if (color == "Red")
                 {
-                    Destroy(prefab);
-                    
-                    
-                }));
-            }else if (mergedColor[i] == "Blue")
-            {
-                SetDiamond("clear",mergedIndex[i]); //close the real one
-                var prefab = Instantiate(diamondPrefabBlue, diamondList[mergedIndex[i]].transform);
-                prefab.transform.localPosition = Vector3.zero;
-                prefab.transform.DOMove(diamondList[toMerge].transform.position, 1f).OnComplete((() =>
+                    RemoveDiamond(mergedIndex[i]);//close the real one
+                    var prefab = Instantiate(diamondPrefabRed, diamondList[mergedIndex[i]].transform);
+                    prefab.transform.localPosition = Vector3.zero;
+                    prefab.transform.DOMove(diamondList[toMerge].transform.position, 1f).OnComplete(() =>
+                    {
+                        Destroy(prefab);
+                    });
+                }else if (color == "Blue")
                 {
-                    Destroy(prefab);
-                }));
-            }else if (mergedColor[i] == "Green")
-            {
-                SetDiamond("clear",mergedIndex[i]); //close the real one
-                var prefab = Instantiate(diamondPrefabGreen, diamondList[mergedIndex[i]].transform);
-                prefab.transform.localPosition = Vector3.zero;
-                prefab.transform.DOMove(diamondList[toMerge].transform.position, 1f).OnComplete((() =>
+                    RemoveDiamond(mergedIndex[i]); //close the real one
+                    var prefab = Instantiate(diamondPrefabBlue, diamondList[mergedIndex[i]].transform);
+                    prefab.transform.localPosition = Vector3.zero;
+                    prefab.transform.DOMove(diamondList[toMerge].transform.position, 1f).OnComplete(() =>
+                    {
+                        Destroy(prefab);
+                    });
+                }else if (color == "Green")
                 {
-                    Destroy(prefab);
-                }));
+                    RemoveDiamond(mergedIndex[i]); //close the real one
+                    var prefab = Instantiate(diamondPrefabGreen, diamondList[mergedIndex[i]].transform);
+                    prefab.transform.localPosition = Vector3.zero;
+                    prefab.transform.DOMove(diamondList[toMerge].transform.position, 1f).OnComplete(() =>
+                    {
+                        Destroy(prefab);
+                    });
+                }
+                else
+                {
+                    RemoveDiamond(mergedIndex[i]); //close the real one
+                    var prefab = Instantiate(diamondPrefabYellow, diamondList[mergedIndex[i]].transform);
+                    prefab.transform.localPosition = Vector3.zero;
+                    prefab.transform.DOMove(diamondList[toMerge].transform.position, 1f).OnComplete(() =>
+                    {
+                        Destroy(prefab);
+                    });
+                }
             }
-            else
+
+            FillEmptySlots(mergedIndex.Count,mergedIndex.Last()+1);
+            Debug.Log("** " + mergedIndex.Count + "  " + mergedIndex.Last()+1);
+        }*/
+
+        private void DiamondUpgradeAnimation(int index,int repeatCount)
+        {
+            diamondList[index].transform.DOScale(new Vector3(2.8f, 1.4f, 2.8f), 0.2f).SetEase(Ease.InOutSine).OnComplete((() =>
             {
-                SetDiamond("clear",mergedIndex[i]); //close the real one
-                var prefab = Instantiate(diamondPrefabYellow, diamondList[mergedIndex[i]].transform);
-                prefab.transform.localPosition = Vector3.zero;
-                prefab.transform.DOMove(diamondList[toMerge].transform.position, 1f).OnComplete((() =>
+                diamondList[index].transform.DOScale(new Vector3(1.4f, 1.4f, 1.4f), 0.2f);
+            })).SetLoops(repeatCount);
+        }
+
+        private void FillEmptySlots(int stepCount,int startIndex)
+        {
+            
+            if (startIndex < diamondColors.Count)
+            {
+                for (int i = startIndex-stepCount; i < startIndex+1; i++)
                 {
-                    Destroy(prefab);
-                }));
+                    SetDiamondColor(diamondColors[i+stepCount],i);
+                }
             }
+            
+
+            for (int i = lastIndex-stepCount; i < lastIndex+1; i++)
+            {
+                SetDiamondColor("clear",i);
+            }
+
+            var x = diamondColors.Count;
+            for (int i = diamondColors.Count-1; i > x - stepCount-1; i--)
+            {
+                //Debug.Log(i);
+                diamondColors.RemoveAt(i);
+            }
+            lastIndex -= stepCount;
         }
 
-        FillEmptySlots(mergedIndex.Count,3/*mergedIndex[mergedIndex.Count]*/);
-    }
-
-    private void DiamondUpgradeAnimation(int index,int repeatCount)
-    {
-        diamondList[index].transform.DOScale(new Vector3(2.8f, 1.4f, 2.8f), 0.2f).SetEase(Ease.InOutSine).OnComplete((() =>
+        private void OnDisable()
         {
-            diamondList[index].transform.DOScale(new Vector3(1.4f, 1.4f, 1.4f), 0.2f);
-        })).SetLoops(repeatCount);
-    }
-
-    private void FillEmptySlots(int stepCount,int startIndex)
-    {
-        for (int i = startIndex-stepCount; i < startIndex+1; i++)
-        {
-            SetDiamond(diamondColors[i+stepCount],i);
+            EventManager.CollectRed -= CollectDiamondRed;
+            EventManager.CollectBlue -= CollectDiamondBlue;
+            EventManager.CollectYellow -= CollectDiamondYellow;
+            EventManager.CollectGreen -= CollectDiamondGreen;
         }
-
-        for (int i = activeIndex-stepCount; i < activeIndex+1; i++)
-        {
-            SetDiamond("clear",i);
-        }
-
-        activeIndex -= stepCount;
     }
 }

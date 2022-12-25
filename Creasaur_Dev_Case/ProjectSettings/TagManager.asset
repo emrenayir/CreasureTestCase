@@ -3,7 +3,14 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - Collectable Red
+  - Collectable Blue
+  - Collectable Yellow
+  - Collectable Green
+  - Door
+  - Trap
+  - Ground
   layers:
   - Default
   - TransparentFX
