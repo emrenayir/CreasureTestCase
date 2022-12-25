@@ -6,6 +6,6 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 475d73eb88be2405790453f6a1f96768
+    path: Assets/Scenes/Emre Experiments/Stack mechanics.unity
+    guid: 2ef5a7b1451f34484ae809477b1870f1
   m_configObjects: {}
